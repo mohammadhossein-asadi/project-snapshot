@@ -10,7 +10,13 @@
     "preview": "vite preview --port 3000 --host 0.0.0.0"
   },
   "dependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/diff": "^8.0.0",
     "clsx": "^2.1.1",
+    "d3": "^7.9.0",
+    "diff": "^9.0.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "jszip": "^3.10.1",
     "lucide-react": "^0.475.0",
     "motion": "^12.4.7",

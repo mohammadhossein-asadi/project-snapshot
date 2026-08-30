@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileCode,
   FolderTree,
@@ -6,6 +6,9 @@ import {
   FileText,
   Braces,
   BarChart3,
+  Share2,
+  Sparkles,
+  Terminal,
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { ScannerUploader } from './components/ScannerUploader';
@@ -16,8 +19,14 @@ import { SecretAudit } from './components/SecretAudit';
 import { MarkdownViewer } from './components/MarkdownViewer';
 import { ManifestViewer } from './components/ManifestViewer';
 import { AnalyticsView } from './components/AnalyticsView';
+import { DependencyGraph } from './components/DependencyGraph';
+import { AiContextGenerator } from './components/AiContextGenerator';
+import { ExecutionSimulationView } from './components/ExecutionSimulationView';
+import { GlobalSearch } from './components/GlobalSearch';
 import { ExportToolbar } from './components/ExportToolbar';
 import { OptionsModal } from './components/OptionsModal';
+import { RecentFilesWidget } from './components/RecentFilesWidget';
+import { motion, AnimatePresence } from 'motion/react';
 import { ScanResult, SnapshotOptions } from './types';
 import { DEFAULT_EXCLUDED_DIRS, DEFAULT_OUTPUT, DEFAULT_MANIFEST } from './lib/constants';
 import { loadSampleProject, scanFromFiles, scanFromZip } from './lib/scanner';
@@ -33,9 +42,22 @@ export const App: React.FC = () => {
 
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'explorer' | 'tree' | 'secrets' | 'markdown' | 'manifest' | 'analytics'>('explorer');
+  const [activeTab, setActiveTab] = useState<
+    | 'explorer'
+    | 'tree'
+    | 'simulation'
+    | 'dependencies'
+    | 'ai-context'
+    | 'secrets'
+    | 'markdown'
+    | 'manifest'
+    | 'analytics'
+  >('explorer');
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [currentUploadedFiles, setCurrentUploadedFiles] = useState<File[] | null>(null);
+  const [globalSearch, setGlobalSearch] = useState<string>('');
+  const [focusedFilePath, setFocusedFilePath] = useState<string>('');
+  const [sessionExcludedPaths, setSessionExcludedPaths] = useState<string[]>([]);
 
   // Initialize with sample project snapshot on startup
   useEffect(() => {
@@ -61,8 +83,7 @@ export const App: React.FC = () => {
     setCurrentUploadedFiles(filesArray);
 
     try {
-      // Determine project root directory name if available
-      let projectName = "uploaded-project";
+      let projectName = 'uploaded-project';
       if (filesArray.length > 0) {
         const first = filesArray[0];
         const rel = (first as any).webkitRelativePath;
@@ -71,7 +92,7 @@ export const App: React.FC = () => {
         }
       }
 
-      const files = filesArray.map(f => ({ file: f }));
+      const files = filesArray.map((f) => ({ file: f }));
       const result = await scanFromFiles(files, projectName, options);
       setScanResult(result);
     } catch (err) {
@@ -99,13 +120,13 @@ export const App: React.FC = () => {
     setIsLoading(true);
     try {
       if (currentUploadedFiles && currentUploadedFiles.length > 0) {
-        let projectName = "uploaded-project";
+        let projectName = 'uploaded-project';
         const first = currentUploadedFiles[0];
         const rel = (first as any).webkitRelativePath;
         if (rel) {
           projectName = rel.split('/')[0] || projectName;
         }
-        const files = currentUploadedFiles.map(f => ({ file: f }));
+        const files = currentUploadedFiles.map((f) => ({ file: f }));
         const result = await scanFromFiles(files, projectName, newOptions);
         setScanResult(result);
       } else {
@@ -118,6 +139,49 @@ export const App: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const handleSelectFileFromGraph = (path: string) => {
+    setFocusedFilePath(path);
+    setActiveTab('explorer');
+  };
+
+  // Quick Ignore handler
+  const handleQuickIgnore = (path: string) => {
+    setSessionExcludedPaths((prev) => {
+      if (prev.includes(path)) return prev;
+      return [...prev, path];
+    });
+  };
+
+  const handleRestoreExcludedPath = (path: string) => {
+    setSessionExcludedPaths((prev) => prev.filter((p) => p !== path));
+  };
+
+  const handleClearAllSessionExclusions = () => {
+    setSessionExcludedPaths([]);
+  };
+
+  // Filter files by global search and session exclusions
+  const globalFilteredFiles = useMemo(() => {
+    if (!scanResult) return [];
+    let list = scanResult.files;
+
+    if (sessionExcludedPaths.length > 0) {
+      list = list.filter((f) => {
+        return !sessionExcludedPaths.some((ex) => {
+          return f.path === ex || f.path.startsWith(ex + '/') || f.path.includes('/' + ex + '/');
+        });
+      });
+    }
+
+    if (!globalSearch.trim()) return list;
+    const lower = globalSearch.toLowerCase();
+    return list.filter(
+      (f) =>
+        f.path.toLowerCase().includes(lower) ||
+        (f.language && f.language.toLowerCase().includes(lower))
+    );
+  }, [scanResult, globalSearch, sessionExcludedPaths]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-500/30 selection:text-blue-200">
@@ -146,6 +210,27 @@ export const App: React.FC = () => {
             {/* Quick Export Toolbar */}
             <ExportToolbar scanResult={scanResult} options={options} />
 
+            {/* Hot & Recent Files Activity Widget */}
+            <RecentFilesWidget
+              files={globalFilteredFiles}
+              gitInfo={scanResult.gitInfo}
+              onSelectFile={(p) => {
+                setFocusedFilePath(p);
+                setActiveTab('explorer');
+              }}
+            />
+
+            {/* Global Search Input Field above Tab Navigation */}
+            <GlobalSearch
+              searchTerm={globalSearch}
+              onSearchChange={(val) => setGlobalSearch(val)}
+              files={scanResult.files}
+              onSelectFile={(p) => {
+                setFocusedFilePath(p);
+                setActiveTab('explorer');
+              }}
+            />
+
             {/* Navigation Tabs */}
             <div className="border-b border-slate-800">
               <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto pb-px scrollbar-none">
@@ -158,9 +243,9 @@ export const App: React.FC = () => {
                   }`}
                 >
                   <FileCode className="w-4 h-4" />
-                  <span>File Explorer & Inspector</span>
+                  <span>File Explorer</span>
                   <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300 font-mono">
-                    {scanResult.files.length}
+                    {globalFilteredFiles.filter((f) => !f.isDirectory).length}
                   </span>
                 </button>
 
@@ -174,6 +259,54 @@ export const App: React.FC = () => {
                 >
                   <FolderTree className="w-4 h-4" />
                   <span>Directory Tree</span>
+                </button>
+
+                {/* Execution Simulation Tab */}
+                <button
+                  onClick={() => setActiveTab('simulation')}
+                  className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-lg text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
+                    activeTab === 'simulation'
+                      ? 'border-emerald-500 text-emerald-400 bg-slate-900/60'
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                  }`}
+                >
+                  <Terminal className="w-4 h-4 text-emerald-400" />
+                  <span>Execution Simulation</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-semibold">
+                    CLI
+                  </span>
+                </button>
+
+                {/* D3.js Import Relationships & Dependency Graph Tab */}
+                <button
+                  onClick={() => setActiveTab('dependencies')}
+                  className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-lg text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
+                    activeTab === 'dependencies'
+                      ? 'border-indigo-500 text-indigo-400 bg-slate-900/60'
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                  }`}
+                >
+                  <Share2 className="w-4 h-4 text-indigo-400" />
+                  <span>Dependency Graph</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 font-mono font-medium">
+                    D3
+                  </span>
+                </button>
+
+                {/* AI Context Generator Tab */}
+                <button
+                  onClick={() => setActiveTab('ai-context')}
+                  className={`flex items-center gap-2 px-3.5 py-2.5 rounded-t-lg text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
+                    activeTab === 'ai-context'
+                      ? 'border-blue-500 text-blue-400 bg-slate-900/60'
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4 text-blue-400" />
+                  <span>AI Context Generator</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 font-mono font-bold">
+                    LLM
+                  </span>
                 </button>
 
                 <button
@@ -226,37 +359,81 @@ export const App: React.FC = () => {
                   }`}
                 >
                   <BarChart3 className="w-4 h-4" />
-                  <span>Analytics</span>
+                  <span>Analytics & Quality</span>
                 </button>
               </div>
             </div>
 
-            {/* Tab Views */}
-            <div>
-              {activeTab === 'explorer' && (
-                <FileExplorer files={scanResult.files} />
-              )}
+            {/* Tab Views with Smooth Fade/Slide-Up Transitions */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22, ease: 'easeOut' }}
+              >
+                {activeTab === 'explorer' && (
+                  <FileExplorer
+                    files={globalFilteredFiles}
+                    initialSelectedPath={focusedFilePath}
+                    globalSearch={globalSearch}
+                    gitInfo={scanResult.gitInfo}
+                    sessionExcludedPaths={sessionExcludedPaths}
+                    onQuickIgnore={handleQuickIgnore}
+                    onRestoreExcludedPath={handleRestoreExcludedPath}
+                    onClearAllSessionExclusions={handleClearAllSessionExclusions}
+                  />
+                )}
 
-              {activeTab === 'tree' && (
-                <TreeViewer files={scanResult.files} includeDefaultHeavy={options.includeDefaultHeavy} />
-              )}
+                {activeTab === 'tree' && (
+                  <TreeViewer
+                    files={globalFilteredFiles}
+                    includeDefaultHeavy={options.includeDefaultHeavy}
+                  />
+                )}
 
-              {activeTab === 'secrets' && (
-                <SecretAudit files={scanResult.files} />
-              )}
+                {activeTab === 'simulation' && (
+                  <ExecutionSimulationView scanResult={scanResult} />
+                )}
 
-              {activeTab === 'markdown' && (
-                <MarkdownViewer scanResult={scanResult} options={options} />
-              )}
+                {activeTab === 'dependencies' && (
+                  <DependencyGraph
+                    files={globalFilteredFiles}
+                    onSelectFile={handleSelectFileFromGraph}
+                    projectName={scanResult.projectName}
+                  />
+                )}
 
-              {activeTab === 'manifest' && (
-                <ManifestViewer scanResult={scanResult} options={options} />
-              )}
+                {activeTab === 'ai-context' && (
+                  <AiContextGenerator
+                    scanResult={scanResult}
+                    onSelectFile={handleSelectFileFromGraph}
+                  />
+                )}
 
-              {activeTab === 'analytics' && (
-                <AnalyticsView stats={scanResult.stats} />
-              )}
-            </div>
+                {activeTab === 'secrets' && (
+                  <SecretAudit files={globalFilteredFiles} />
+                )}
+
+                {activeTab === 'markdown' && (
+                  <MarkdownViewer scanResult={scanResult} options={options} />
+                )}
+
+                {activeTab === 'manifest' && (
+                  <ManifestViewer scanResult={scanResult} options={options} />
+                )}
+
+                {activeTab === 'analytics' && (
+                  <AnalyticsView
+                    stats={scanResult.stats}
+                    files={globalFilteredFiles}
+                    gitInfo={scanResult.gitInfo}
+                    onSelectFile={handleSelectFileFromGraph}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         )}
       </main>
