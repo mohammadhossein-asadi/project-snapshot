@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Copy, Check, Download, FileText, Sparkles } from 'lucide-react';
+import { Copy, Check, Download, FileText, Sparkles, ChevronDown } from 'lucide-react';
 import { ScanResult, SnapshotOptions } from '../types';
 import { formatMarkdown } from '../lib/output';
 
@@ -11,13 +11,14 @@ interface MarkdownViewerProps {
 export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ scanResult, options }) => {
   const [copied, setCopied] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [promptFormat, setPromptFormat] = useState<'standard' | 'gemini' | 'claude'>('standard');
+  const [showFormatDropdown, setShowFormatDropdown] = useState(false);
 
   const markdownContent = useMemo(() => {
     return formatMarkdown(scanResult, options);
   }, [scanResult, options]);
 
   const estimatedTokens = useMemo(() => {
-    // Approx 4 characters per token
     return Math.round(markdownContent.length / 4);
   }, [markdownContent]);
 
@@ -31,12 +32,21 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ scanResult, opti
     }
   };
 
-  const handleCopyForAI = async () => {
-    const promptHeader = `Here is the complete codebase snapshot for project "${scanResult.projectName}". Please analyze the project context, directory structure, and source files:\n\n`;
+  const handleCopyForAI = async (format: 'standard' | 'gemini' | 'claude' = promptFormat) => {
+    let header = '';
+    if (format === 'gemini') {
+      header = `// Google Gemini & Antigravity Context\n// Project: ${scanResult.projectName} (${scanResult.stats.totalFiles} files)\n// Instructions: Review this complete codebase context to assist with software engineering tasks.\n\n`;
+    } else if (format === 'claude') {
+      header = `<project_context name="${scanResult.projectName}" files="${scanResult.stats.totalFiles}">\nThis is the complete structured codebase snapshot for "${scanResult.projectName}".\n</project_context>\n\n`;
+    } else {
+      header = `Here is the complete codebase snapshot for project "${scanResult.projectName}". Please analyze the project context, directory structure, and key file contents:\n\n`;
+    }
+
     try {
-      await navigator.clipboard.writeText(promptHeader + markdownContent);
+      await navigator.clipboard.writeText(header + markdownContent);
       setCopiedPrompt(true);
-      setTimeout(() => setCopiedPrompt(false), 2000);
+      setShowFormatDropdown(false);
+      setTimeout(() => setCopiedPrompt(false), 2500);
     } catch {
       // ignore
     }
@@ -71,24 +81,72 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ scanResult, opti
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCopyForAI}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
-            title="Copy with prompt header for Claude / ChatGPT / Gemini"
-          >
-            {copiedPrompt ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                <span>Prompt Copied!</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Copy for AI Prompt</span>
-              </>
+        <div className="flex items-center gap-2 relative">
+          {/* Copy for AI Button with Format Selector */}
+          <div className="relative inline-flex rounded-lg shadow-sm">
+            <button
+              onClick={() => handleCopyForAI(promptFormat)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
+              title="Copy entire project context formatted for LLMs"
+            >
+              {copiedPrompt ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Context Copied for AI!</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Copy for AI</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setShowFormatDropdown(!showFormatDropdown)}
+              className="px-1.5 py-1.5 rounded-r-lg bg-indigo-700 hover:bg-indigo-600 border-l border-indigo-500/30 text-white text-xs transition cursor-pointer"
+              title="Select AI Prompt Format"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+
+            {showFormatDropdown && (
+              <div className="absolute right-0 top-full mt-1.5 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-20 py-1 text-xs text-slate-300 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-3 py-1 text-[10px] uppercase font-semibold text-slate-400 border-b border-slate-800">
+                  Target AI Format
+                </div>
+                <button
+                  onClick={() => {
+                    setPromptFormat('standard');
+                    handleCopyForAI('standard');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between cursor-pointer"
+                >
+                  <span className="font-medium">Standard Prompt Format</span>
+                  {promptFormat === 'standard' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                </button>
+                <button
+                  onClick={() => {
+                    setPromptFormat('gemini');
+                    handleCopyForAI('gemini');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between cursor-pointer"
+                >
+                  <span className="font-medium">Gemini / Claude Markdown</span>
+                  {promptFormat === 'gemini' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                </button>
+                <button
+                  onClick={() => {
+                    setPromptFormat('claude');
+                    handleCopyForAI('claude');
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between cursor-pointer"
+                >
+                  <span className="font-medium">XML Tag Wrapped</span>
+                  {promptFormat === 'claude' && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                </button>
+              </div>
             )}
-          </button>
+          </div>
 
           <button
             onClick={handleCopy}
@@ -126,3 +184,4 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({ scanResult, opti
     </div>
   );
 };
+

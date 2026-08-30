@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Download, FileText, Braces, Sparkles, Check, Archive } from 'lucide-react';
+import { Download, FileText, Braces, Sparkles, Check, Archive, FileDown } from 'lucide-react';
 import JSZip from 'jszip';
 import { ScanResult, SnapshotOptions } from '../types';
 import { formatMarkdown, formatJsonManifest } from '../lib/output';
+import { generatePdfReport } from '../lib/pdfReport';
 
 interface ExportToolbarProps {
   scanResult: ScanResult;
@@ -12,6 +13,18 @@ interface ExportToolbarProps {
 export const ExportToolbar: React.FC<ExportToolbarProps> = ({ scanResult, options }) => {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = () => {
+    setIsGeneratingPdf(true);
+    try {
+      generatePdfReport(scanResult, options);
+    } catch (err) {
+      console.error('Failed to generate PDF:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const handleDownloadMarkdown = () => {
     const md = formatMarkdown(scanResult, options);
@@ -122,6 +135,16 @@ export const ExportToolbar: React.FC<ExportToolbarProps> = ({ scanResult, option
         >
           <Braces className="w-3.5 h-3.5 text-purple-400" />
           <span>JSON</span>
+        </button>
+
+        <button
+          onClick={handleDownloadPdf}
+          disabled={isGeneratingPdf}
+          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition disabled:opacity-50 cursor-pointer"
+          title="Download comprehensive PDF architecture & quality audit report"
+        >
+          <FileDown className="w-3.5 h-3.5 text-rose-400" />
+          <span>{isGeneratingPdf ? 'Generating PDF...' : 'PDF Report'}</span>
         </button>
 
         <button
