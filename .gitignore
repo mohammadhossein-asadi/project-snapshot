@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+eggs/
+
+# Build output
+dist/
+build/
+out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Cache
+.cache/
+.mypy_cache/
+.pytest_cache/
+.tox/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+
+# Generated output (the tool generates these)
+README.md
+PROJECT-SNAPSHOT.json
