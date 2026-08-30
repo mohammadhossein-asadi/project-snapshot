@@ -40,6 +40,6 @@ desktop.ini
 # Logs
 *.log
 
-# Generated output (the tool generates these)
-README.md
-PROJECT-SNAPSHOT.json
+# Generated output (add these to YOUR project's .gitignore if needed)
+# README.md
+# PROJECT-SNAPSHOT.json
