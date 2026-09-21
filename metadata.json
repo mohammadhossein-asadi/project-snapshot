@@ -1,8 +1,5 @@
 {
   "name": "Project Snapshot",
   "description": "Cross-platform project documentation, secret detection, directory tree visualization, and codebase snapshot generator for AI context.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "requestFramePermissions": []
 }
