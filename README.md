@@ -40,6 +40,18 @@ Project Snapshot is a standalone Python script that analyzes any project directo
 
 ---
 
+## Screenshots
+
+All captured from the documented CLI output (regenerate with `scripts/make-cli-screenshots.py` in the portfolio repo):
+
+| Statistics | Languages & tree |
+|:---:|:---:|
+| ![Project statistics](docs/screenshot-1.png) | ![Language breakdown and tree](docs/screenshot-2.png) |
+| **Secret redaction** | **JSON manifest** |
+| ![Secret detection](docs/screenshot-3.png) | ![JSON manifest output](docs/screenshot-4.png) |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
